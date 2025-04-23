@@ -2,15 +2,12 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install uv
-RUN pip install --no-cache-dir uv
-
 # Copy lock file and code
-COPY uv.lock pyproject.toml ./
+COPY requirements.txt .
 COPY main.py .
 
 # Install dependencies using the lock file
-RUN uv sync
+RUN pip install -r requirements.txt
 
 # Cloud Run will set PORT environment variable
 ENV PORT=8080

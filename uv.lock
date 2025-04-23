@@ -178,12 +178,14 @@ source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "mcp", extra = ["cli"] },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = "==0.115.9" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.6.0" },
+    { name = "uvicorn", specifier = "==0.34.2" },
 ]
 
 [[package]]

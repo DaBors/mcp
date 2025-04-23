@@ -1,6 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from fastapi import FastAPI
 import uvicorn
+from os import environ
 
 # Create an MCP server
 mcp = FastMCP("Demo")
@@ -25,4 +26,5 @@ def root():
     return {"message": "Welcome to the MCP Demo API"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

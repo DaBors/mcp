@@ -24,7 +24,3 @@ app.mount("/mcp", mcp.sse_app())
 @app.get("/")
 def root():
     return {"message": "Welcome to the MCP Demo API"}
-
-if __name__ == "__main__":
-    port = int(environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)

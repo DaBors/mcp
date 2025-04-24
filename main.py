@@ -1,16 +1,17 @@
+from os import environ
 from mcp.server.fastmcp import FastMCP
 from fastapi import FastAPI, HTTPException
 from google.cloud import storage
 
 # Create an MCP server
 mcp = FastMCP("Demo")
-bucket_name = "mcp-demo"
 
 @mcp.resource("file://list")
 def file_list() -> list[str]:
     """List all files in the bucket"""
     storage_client = storage.Client()
 
+    bucket_name = environ.get("BUCKET_NAME", "mcp-demo")
     blobs = storage_client.list_blobs(bucket_name, prefix="texts/")
 
     files = [blob.name.replace("texts/", "") for blob in blobs if not blob.name.endswith("/")]
@@ -21,6 +22,7 @@ def file(filename: str) -> str:
     """Read a file"""
     storage_client = storage.Client()
 
+    bucket_name = environ.get("BUCKET_NAME", "mcp-demo")
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(f"texts/{filename}")
 

@@ -2,6 +2,8 @@ from os import environ
 from mcp.server.fastmcp import FastMCP
 from fastapi import FastAPI, HTTPException
 from google.cloud import storage
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Create an MCP server
 mcp = FastMCP("Demo")
@@ -32,6 +34,12 @@ def file(filename: str) -> str:
     return blob.download_as_string().decode("utf-8")
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 app.mount("/mcp", mcp.sse_app())
 
 @app.get("/")

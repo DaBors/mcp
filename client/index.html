@@ -428,7 +428,7 @@
                 try {
                     const encodedQuery = encodeURIComponent(query);
                     const results = await mcpRequest(
-                        `vector_search://${encodedQuery}`
+                        `vector://search/${encodedQuery}`
                     );
                     renderSearchResults(results, query);
                     document.getElementById("search-loading").style.display =
@@ -447,37 +447,25 @@
                 const searchResultsElement =
                     document.getElementById("search-results");
 
-                if (
-                    !results ||
-                    !results.nearest_neighbors ||
-                    results.nearest_neighbors.length === 0
-                ) {
+                const parsedResults = eval(results);
+
+                if (!parsedResults || parsedResults.length === 0) {
                     searchResultsElement.innerHTML = "<p>No results found</p>";
-                    return;
-                }
-
-                // Get the first (and likely only) set of neighbors
-                const neighbors = results.nearest_neighbors[0].neighbors;
-
-                if (!neighbors || neighbors.length === 0) {
-                    searchResultsElement.innerHTML =
-                        "<p>No matches found for your query</p>";
                     return;
                 }
 
                 let html = `<h3>Results for: "${query}"</h3>`;
 
-                neighbors.forEach((neighbor, index) => {
-                    const score = neighbor.distance.toFixed(4);
-                    const id = neighbor.datapoint.datapoint_id;
+                parsedResults.forEach((neighbor, index) => {
+                    const distance = neighbor.distance.toFixed(4);
+                    const id = neighbor.chunk_id;
 
                     html += `
                                 <div class="result-item">
                                     <p><strong>Result #${
                                         index + 1
-                                    }</strong> (Score: ${score})</p>
+                                    }</strong> (Distance: ${distance})</p>
                                     <p>ID: ${id}</p>
-                                    <button onclick="loadFileById('${id}')">View Document</button>
                                 </div>
                             `;
                 });

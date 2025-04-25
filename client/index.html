@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>MCP Demo Application</title>
+        <style>
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f5f5f5;
+                color: #333;
+            }
+            .container {
+                display: grid;
+                grid-template-columns: 250px 1fr;
+                gap: 20px;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            .sidebar {
+                background-color: white;
+                border-radius: 8px;
+                padding: 15px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            }
+            .main-content {
+                background-color: white;
+                border-radius: 8px;
+                padding: 20px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            }
+            h1,
+            h2,
+            h3 {
+                margin-top: 0;
+                color: #2c3e50;
+            }
+            .search-bar {
+                width: 100%;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                margin-bottom: 20px;
+                box-sizing: border-box;
+            }
+            button {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: background-color 0.3s;
+            }
+            button:hover {
+                background-color: #2980b9;
+            }
+            .file-item {
+                padding: 8px;
+                border-bottom: 1px solid #eee;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+            .file-item:hover {
+                background-color: #f0f0f0;
+            }
+            .file-content {
+                white-space: pre-wrap;
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 4px;
+                border: 1px solid #ddd;
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            .search-results {
+                margin-top: 20px;
+            }
+            .result-item {
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                margin-bottom: 10px;
+                background-color: #f8f9fa;
+            }
+            .loading {
+                display: none;
+                text-align: center;
+                padding: 20px;
+                font-style: italic;
+                color: #777;
+            }
+            .tab-content {
+                display: none;
+            }
+            .tab-content.active {
+                display: block;
+            }
+            .tabs {
+                display: flex;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #ddd;
+            }
+            .tab {
+                padding: 10px 20px;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+            }
+            .tab.active {
+                border-bottom: 2px solid #3498db;
+                color: #3498db;
+                font-weight: bold;
+            }
+            .connection-status {
+                margin-bottom: 20px;
+                padding: 10px;
+                border-radius: 4px;
+                text-align: center;
+            }
+            .connection-status.connected {
+                background-color: #d4edda;
+                color: #155724;
+            }
+            .connection-status.connecting {
+                background-color: #fff3cd;
+                color: #856404;
+            }
+            .connection-status.disconnected {
+                background-color: #f8d7da;
+                color: #721c24;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="sidebar">
+                <h2>Files</h2>
+                <div id="file-list" class="file-list">
+                    <div class="loading" id="file-list-loading">
+                        Loading files...
+                    </div>
+                </div>
+            </div>
+            <div class="main-content">
+                <h1>MCP Demo Application</h1>
+
+                <div
+                    id="connection-status"
+                    class="connection-status connecting"
+                >
+                    Connecting to MCP server...
+                </div>
+
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('file-viewer')">
+                        File Viewer
+                    </div>
+                    <div class="tab" onclick="switchTab('vector-search')">
+                        Vector Search
+                    </div>
+                </div>
+
+                <div id="file-viewer" class="tab-content active">
+                    <h2>File Content</h2>
+                    <p id="no-file-selected">
+                        Select a file from the sidebar to view its content.
+                    </p>
+                    <div class="loading" id="file-content-loading">
+                        Loading file content...
+                    </div>
+                    <pre
+                        id="file-content"
+                        class="file-content"
+                        style="display: none"
+                    ></pre>
+                </div>
+
+                <div id="vector-search" class="tab-content">
+                    <h2>Vector Search</h2>
+                    <input
+                        type="text"
+                        id="search-query"
+                        class="search-bar"
+                        placeholder="Enter your search query..."
+                    />
+                    <button onclick="performVectorSearch()">Search</button>
+                    <div class="loading" id="search-loading">Searching...</div>
+                    <div id="search-results" class="search-results"></div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const BASE_URL = "https://mcp-54087748514.europe-north1.run.app";
+            const MCP_URL = `${BASE_URL}/mcp`;
+            let currentFileName = null;
+            let mcpSession = null;
+            let mcpSessionId = null;
+
+            // Initialize the application
+            document.addEventListener("DOMContentLoaded", function () {
+                initializeMCPSession();
+            });
+
+            // Initialize MCP session
+            async function initializeMCPSession() {
+                updateConnectionStatus(
+                    "connecting",
+                    "Connecting to MCP server..."
+                );
+
+                // Connect to the SSE endpoint to establish a session
+                mcpSession = new EventSource(`${MCP_URL}/sse`);
+
+                mcpSession.addEventListener("endpoint", async (event) => {
+                    console.log("Message from MCP server:", event.data);
+                    const sessionId = event.data.split("session_id=")[1];
+
+                    // Check if this is a session initialization message
+                    if (sessionId) {
+                        mcpSessionId = sessionId;
+
+                        await sendMCPMessage({
+                            method: "initialize",
+                            params: {
+                                protocolVersion: "2024-11-05",
+                                capabilities: {
+                                    sampling: {},
+                                    roots: {
+                                        listChanged: true,
+                                    },
+                                },
+                                clientInfo: {
+                                    name: "mcp-inspector",
+                                    version: "0.10.2",
+                                },
+                            },
+                            jsonrpc: "2.0",
+                            id: 0,
+                        });
+                        await sendMCPMessage({
+                            method: "notifications/initialized",
+                            jsonrpc: "2.0",
+                        });
+
+                        console.log(
+                            "MCP session established with ID:",
+                            mcpSessionId
+                        );
+                        updateConnectionStatus(
+                            "connected",
+                            "Connected to MCP server"
+                        );
+
+                        // Now that we have a session, load the file list
+                        loadFileList();
+                    }
+                });
+            }
+
+            async function sendMCPMessage(message) {
+                return fetch(
+                    `${MCP_URL}/messages/?session_id=${mcpSessionId}`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(message),
+                    }
+                );
+            }
+
+            function updateConnectionStatus(status, message) {
+                const statusElement =
+                    document.getElementById("connection-status");
+                statusElement.className = `connection-status ${status}`;
+                statusElement.textContent = message;
+            }
+
+            // Switch between tabs
+            function switchTab(tabId) {
+                // Hide all tab contents
+                document.querySelectorAll(".tab-content").forEach((tab) => {
+                    tab.classList.remove("active");
+                });
+
+                // Show the selected tab content
+                document.getElementById(tabId).classList.add("active");
+
+                // Update tab styling
+                document.querySelectorAll(".tab").forEach((tab) => {
+                    tab.classList.remove("active");
+                });
+                event.currentTarget.classList.add("active");
+            }
+
+            // Make an MCP request
+            function mcpRequest(resource) {
+                if (!mcpSessionId) {
+                    console.error("No MCP session established");
+                    return Promise.reject("No MCP session established");
+                }
+
+                return new Promise((resolve, reject) => {
+                    const messageId = Date.now().toString();
+
+                    // Set up a message handler for this specific request
+                    const messageHandler = function (event) {
+                        const data = JSON.parse(event.data);
+
+                        // Check if this is a response to our request
+                        if (event.type === "message" && data.id === messageId) {
+                            // Remove the event listener once we get the response
+                            mcpSession.removeEventListener(
+                                "message",
+                                messageHandler
+                            );
+                            resolve(data.result.contents[0].text);
+                        }
+                    };
+
+                    // Add the message handler
+                    mcpSession.addEventListener("message", messageHandler);
+
+                    // Send the request by posting a message to the session
+                    const request = {
+                        method: "resources/read",
+                        params: {
+                            uri: resource,
+                            _meta: {
+                                progressToken: messageId,
+                            },
+                        },
+                        jsonrpc: "2.0",
+                        id: messageId,
+                    };
+
+                    // Send the request via the session
+                    sendMCPMessage(request).catch((error) => {
+                        mcpSession.removeEventListener(
+                            "message",
+                            messageHandler
+                        );
+                        reject(error);
+                    });
+                });
+            }
+
+            // Load list of files from the server
+            async function loadFileList() {
+                try {
+                    element = document.getElementById("file-list-loading");
+                    element.style.display = "block";
+
+                    const files = await mcpRequest("file://list");
+                    renderFileList(files);
+                    element.style.display = "none";
+                } catch (error) {
+                    console.error("Error loading file list:", error);
+                    element.style.display = "none";
+                }
+            }
+
+            // Render the file list in the sidebar
+            function renderFileList(files) {
+                const fileListElement = document.getElementById("file-list");
+
+                if (!files || files.length === 0) {
+                    fileListElement.innerHTML = "<p>No files found</p>";
+                    return;
+                }
+
+                let html = "";
+                eval(files).forEach((file) => {
+                    html += `<div class="file-item" onclick="loadFile('${file}')">${file}</div>`;
+                });
+
+                fileListElement.innerHTML = html;
+            }
+
+            // Load a specific file's content
+            async function loadFile(fileName) {
+                currentFileName = fileName;
+                document.getElementById("no-file-selected").style.display =
+                    "none";
+                document.getElementById("file-content").style.display = "none";
+                document.getElementById("file-content-loading").style.display =
+                    "block";
+
+                try {
+                    const content = await mcpRequest(`file://text/${fileName}`);
+                    document.getElementById("file-content").textContent =
+                        content;
+                    document.getElementById("file-content").style.display =
+                        "block";
+                    document.getElementById(
+                        "file-content-loading"
+                    ).style.display = "none";
+                } catch (error) {
+                    console.error(`Error loading file: ${fileName}`, error);
+                    document.getElementById(
+                        "file-content-loading"
+                    ).style.display = "none";
+                    document.getElementById(
+                        "file-content"
+                    ).textContent = `Error loading file: ${fileName}`;
+                    document.getElementById("file-content").style.display =
+                        "block";
+                }
+            }
+
+            // Perform vector search
+            async function performVectorSearch() {
+                const query = document
+                    .getElementById("search-query")
+                    .value.trim();
+
+                if (!query) {
+                    alert("Please enter a search query");
+                    return;
+                }
+
+                document.getElementById("search-results").innerHTML = "";
+                document.getElementById("search-loading").style.display =
+                    "block";
+
+                try {
+                    const encodedQuery = encodeURIComponent(query);
+                    const results = await mcpRequest(
+                        `vector_search://${encodedQuery}`
+                    );
+                    renderSearchResults(results, query);
+                    document.getElementById("search-loading").style.display =
+                        "none";
+                } catch (error) {
+                    console.error("Error performing search:", error);
+                    document.getElementById("search-loading").style.display =
+                        "none";
+                    document.getElementById("search-results").innerHTML =
+                        "<p>Error performing search</p>";
+                }
+            }
+
+            // Render search results
+            function renderSearchResults(results, query) {
+                const searchResultsElement =
+                    document.getElementById("search-results");
+
+                if (
+                    !results ||
+                    !results.nearest_neighbors ||
+                    results.nearest_neighbors.length === 0
+                ) {
+                    searchResultsElement.innerHTML = "<p>No results found</p>";
+                    return;
+                }
+
+                // Get the first (and likely only) set of neighbors
+                const neighbors = results.nearest_neighbors[0].neighbors;
+
+                if (!neighbors || neighbors.length === 0) {
+                    searchResultsElement.innerHTML =
+                        "<p>No matches found for your query</p>";
+                    return;
+                }
+
+                let html = `<h3>Results for: "${query}"</h3>`;
+
+                neighbors.forEach((neighbor, index) => {
+                    const score = neighbor.distance.toFixed(4);
+                    const id = neighbor.datapoint.datapoint_id;
+
+                    html += `
+                                <div class="result-item">
+                                    <p><strong>Result #${
+                                        index + 1
+                                    }</strong> (Score: ${score})</p>
+                                    <p>ID: ${id}</p>
+                                    <button onclick="loadFileById('${id}')">View Document</button>
+                                </div>
+                            `;
+                });
+
+                searchResultsElement.innerHTML = html;
+            }
+
+            // Try to load a file based on its ID
+            function loadFileById(id) {
+                // If the ID is a filename, try to load it directly
+                loadFile(id);
+                switchTab("file-viewer");
+            }
+        </script>
+    </body>
+</html>
